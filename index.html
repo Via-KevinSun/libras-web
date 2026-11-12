@@ -1,0 +1,266 @@
+<!DOCTYPE html>
+<html lang="pt-BR">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1">
+<title>Letras em LIBRAS</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
+<style>
+:root{--bg:#F3F5F9;--ink:#16213A;--muted:#5B6578;--line:#D5DBE7;--blue:#2D5BE3;--ok:#1F9D6B;--gold:#E8A90C;--warn:#B4540A}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:17px/1.5 "Atkinson Hyperlegible",system-ui,sans-serif}
+button,input{font:inherit;color:inherit}
+:focus-visible{outline:3px solid var(--blue);outline-offset:2px}
+.wrap{max-width:1120px;margin:0 auto;padding:24px 20px 48px}
+header{display:flex;justify-content:space-between;align-items:center;gap:16px;flex-wrap:wrap;margin-bottom:24px}
+h1{font-size:1.6rem;margin:0;letter-spacing:-.01em}
+.sub{color:var(--muted);margin:2px 0 0;font-size:.95rem}
+.status{display:flex;align-items:center;gap:8px;padding:6px 14px;border:1px solid var(--line);border-radius:999px;background:#fff;font-size:.95rem}
+.dot{width:10px;height:10px;border-radius:50%;background:var(--muted)}
+.status.on .dot{background:var(--ok)}.status.err .dot{background:var(--warn)}
+.grid{display:grid;grid-template-columns:minmax(0,1.5fr) minmax(0,1fr);gap:32px;align-items:start}
+.stage{position:relative;aspect-ratio:4/3;background:#0F1730;border-radius:18px;overflow:hidden;border:1px solid var(--line)}
+.stage canvas{width:100%;height:100%;object-fit:cover;display:block}
+#ativar{position:absolute;left:50%;top:44%;transform:translate(-50%,-50%);padding:14px 28px;font-size:1.1rem}
+.hint{position:absolute;inset:auto 0 0 0;padding:14px 18px;background:rgba(15,23,48,.78);color:#fff;font-size:1rem}
+.read{display:flex;flex-direction:column;align-items:center;gap:14px}
+.ring{position:relative;width:190px;height:190px}
+.ring svg{transform:rotate(-90deg);width:100%;height:100%}
+.ring circle{fill:none;stroke-width:9}
+.ring .bg{stroke:var(--line)}
+.ring .fg{stroke:var(--gold);stroke-linecap:round;stroke-dasharray:339.3;stroke-dashoffset:339.3;transition:stroke-dashoffset .12s linear}
+.ring.done .fg{stroke:var(--ok)}
+.letter{position:absolute;inset:0;display:grid;place-items:center;font-size:5.5rem;font-weight:700;line-height:1}
+.letter.dim{color:var(--line)}
+.msg{margin:0;text-align:center;min-height:3em;color:var(--muted)}
+.bars{width:100%;display:grid;gap:8px}
+.bar{display:grid;grid-template-columns:24px 1fr 44px;align-items:center;gap:10px;font-size:.95rem}
+.bar i{display:block;height:8px;border-radius:4px;background:var(--blue);width:0;transition:width .12s}
+.bar span:last-child{text-align:right;color:var(--muted)}
+.write{margin-top:32px}
+.write h2,.alpha h2{font-size:1.1rem;margin:0 0 8px}
+#texto{min-height:84px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:2.2rem;font-weight:700;letter-spacing:.06em;word-break:break-all}
+#texto:empty::before{content:"As letras confirmadas aparecem aqui.";font-size:1rem;font-weight:400;letter-spacing:0;color:var(--muted)}
+.actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
+.btn{padding:9px 16px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
+.btn:hover{border-color:var(--blue)}
+.btn.main{background:var(--blue);border-color:var(--blue);color:#fff}
+.alpha{margin-top:32px}
+.letters{display:grid;grid-template-columns:repeat(13,1fr);gap:6px}
+.letters b{display:grid;place-items:center;aspect-ratio:1;border-radius:8px;border:1px solid var(--line);background:#fff;font-size:1.1rem;transition:background .15s}
+.letters b.off{background:transparent;color:#A8B0C0;border-style:dashed}
+.letters b.now{background:var(--gold);border-color:var(--gold)}
+.letters b.added{background:var(--ok);border-color:var(--ok);color:#fff}
+.note{color:var(--muted);font-size:.92rem;margin:10px 0 0;max-width:68ch}
+details{margin-top:32px;border-top:1px solid var(--line);padding-top:16px}
+summary{cursor:pointer;font-weight:700}
+.ctl{display:grid;grid-template-columns:200px 1fr 56px;gap:12px;align-items:center;margin-top:14px}
+.ctl small{display:block;color:var(--muted)}
+input[type=range]{width:100%;accent-color:var(--blue)}
+.tips{margin:24px 0 0;padding-left:20px;max-width:70ch}
+@media(max-width:820px){.grid{grid-template-columns:1fr}.letters{grid-template-columns:repeat(9,1fr)}.ctl{grid-template-columns:1fr 56px}.ctl>div{grid-column:1/-1}}
+@media(prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<div class="wrap">
+  <header>
+    <div>
+      <h1>Letras em LIBRAS</h1>
+      <p class="sub">Faça uma letra do alfabeto manual diante da câmera e veja a palavra se formar.</p>
+    </div>
+    <div class="status" id="status" role="status"><span class="dot"></span><span id="statusTxt">Câmera desligada</span></div>
+  </header>
+
+  <div class="grid">
+    <div class="stage">
+      <video id="cam" playsinline muted hidden></video>
+      <canvas id="out" aria-label="Imagem da câmera com os pontos da sua mão"></canvas>
+      <button class="btn main" id="ativar">Ativar câmera</button>
+      <div class="hint" id="hint">A imagem fica só no seu computador. Clique em “Ativar câmera” para começar.</div>
+    </div>
+    <div class="read">
+      <div class="ring" id="ring">
+        <svg viewBox="0 0 120 120" aria-hidden="true"><circle class="bg" cx="60" cy="60" r="54"/><circle class="fg" id="fg" cx="60" cy="60" r="54"/></svg>
+        <div class="letter dim" id="letter" aria-live="polite">?</div>
+      </div>
+      <p class="msg" id="msg">Segure a letra por um segundo para confirmá-la.</p>
+      <div class="bars" id="bars"></div>
+    </div>
+  </div>
+
+  <section class="write">
+    <h2>Texto</h2>
+    <div id="texto" aria-live="polite"></div>
+    <div class="actions">
+      <button class="btn" data-a="espaco">Espaço</button>
+      <button class="btn" data-a="apagar">Apagar última</button>
+      <button class="btn" data-a="limpar">Limpar tudo</button>
+      <button class="btn main" id="copiar">Copiar texto</button>
+      <button class="btn" id="ouvir">Ouvir texto</button>
+    </div>
+    <p class="note">Atalhos: barra de espaço, Backspace e a tecla C (limpar).</p>
+  </section>
+
+  <section class="alpha">
+    <h2>Letras que o programa conhece</h2>
+    <div class="letters" id="letters"></div>
+    <p class="note">As letras tracejadas ainda não foram treinadas: faltam muitas do alfabeto e todas as que exigem movimento. Este programa reconhece o alfabeto manual, não a LIBRAS completa.</p>
+  </section>
+
+  <details>
+    <summary>Ajustes</summary>
+    <div class="ctl">
+      <div><label for="conf">Exigência de confiança</label><small>Suba se aparecerem letras erradas; baixe se as letras demoram.</small></div>
+      <input type="range" id="conf" min="50" max="95" step="1"><span id="confV"></span>
+    </div>
+    <div class="ctl">
+      <div><label for="hold">Tempo segurando a letra</label><small>Suba se letras saírem sem querer; baixe se demorar demais.</small></div>
+      <input type="range" id="hold" min="5" max="20" step="1"><span id="holdV"></span>
+    </div>
+    <ul class="tips">
+      <li>Repita uma letra (como em BOLA ou CASA) abaixando a mão entre uma e outra.</li>
+      <li>Use boa luz e deixe a palma inteira visível. M e N são as letras mais difíceis.</li>
+      <li>Acentos e Ç não são escritos: OLÁ sai como OLA.</li>
+    </ul>
+  </details>
+</div>
+
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/hands.js" crossorigin="anonymous"></script>
+<script src="https://cdn.jsdelivr.net/npm/@mediapipe/drawing_utils@0.3.1675466124/drawing_utils.js" crossorigin="anonymous"></script>
+<script>
+const $ = id => document.getElementById(id);
+const ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", JANELA = 8;
+const cfg = {conf_min: 0.80, hold: 1.0};
+let M = null, texto = "", n = 0, ultima = "", recentes = [], cand = null, desde = 0, emitida = false, flashT = null;
+const cam = $("cam"), out = $("out"), ctx = out.getContext("2d");
+
+function setStatus(cls, txt){ $("status").className = "status " + cls; $("statusTxt").textContent = txt; }
+function mostrarHint(t){ $("hint").style.display = "block"; $("hint").textContent = t; }
+
+// ---- modelo (mesma conta da rede treinada: Dense-ReLU, Dense-ReLU, Dense-Softmax)
+function denso(x, W, b, relu){
+  const y = b.slice();
+  for (let i = 0; i < x.length; i++){ const xi = x[i], r = W[i]; for (let j = 0; j < y.length; j++) y[j] += xi * r[j]; }
+  return relu ? y.map(v => Math.max(0, v)) : y;
+}
+function prever(x){
+  const z = denso(denso(denso(x, M.W0, M.b0, true), M.W1, M.b1, true), M.W2, M.b2, false);
+  const mx = Math.max(...z), e = z.map(v => Math.exp(v - mx)), s = e.reduce((a, c) => a + c, 0);
+  return e.map(v => v / s);
+}
+function normalizar(lm){                       // identica ao treino
+  const o = lm[0], pts = lm.map(p => [p.x - o.x, p.y - o.y, p.z - o.z]);
+  const esc = Math.max(Math.hypot(pts[9][0], pts[9][1]), 1e-6);
+  return pts.flatMap(p => [p[0] / esc, p[1] / esc, p[2] / esc]);
+}
+
+// ---- tempo real
+function aoResultado(res){
+  const agora = performance.now() / 1000;
+  let temMao = false, top3 = [], letraAtual = null, conf = 0, prog = 0;
+  if (res.multiHandLandmarks && res.multiHandLandmarks.length){
+    temMao = true;
+    const lm = res.multiHandLandmarks[0];
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: "#E8A90C", lineWidth: 3});
+    drawLandmarks(ctx, lm, {color: "#fff", lineWidth: 1, radius: 3});
+    const p = prever(normalizar(lm));
+    const ordem = p.map((v, i) => i).sort((a, b) => p[b] - p[a]).slice(0, 3);
+    top3 = ordem.map(i => [M.classes[i], p[i]]);
+    letraAtual = M.classes[ordem[0]]; conf = p[ordem[0]];
+    recentes.push(conf >= cfg.conf_min ? letraAtual : null);
+    if (recentes.length > JANELA) recentes.shift();
+    const cont = {}; recentes.forEach(l => cont[l] = (cont[l] || 0) + 1);
+    const [letra, votos] = Object.entries(cont).sort((a, b) => b[1] - a[1])[0];
+    if (letra !== "null" && votos >= JANELA * 0.7){
+      if (letra !== cand){ cand = letra; desde = agora; emitida = false; }
+      else if (!emitida && agora - desde >= cfg.hold){ texto += letra; n++; ultima = letra; emitida = true; }
+    } else { cand = null; emitida = false; }
+    if (cand) prog = emitida ? 1 : Math.min(1, (agora - desde) / cfg.hold);
+  } else { recentes = []; cand = null; emitida = false; }
+  desenhar({temMao, top3, letra: letraAtual, conf, progresso: prog});
+}
+
+// ---- interface
+function construir(){
+  $("letters").innerHTML = [...ALL].map(l => `<b data-l="${l}" class="${M.classes.includes(l) ? "" : "off"}">${l}</b>`).join("");
+  $("bars").innerHTML = [0,1,2].map(i => `<div class="bar"><span id="bl${i}">–</span><div><i id="bb${i}"></i></div><span id="bp${i}"></span></div>`).join("");
+}
+let nVisto = 0;
+function desenhar(s){
+  setStatus("on", s.temMao ? "Mão detectada" : "Procurando a mão");
+  $("hint").style.display = s.temMao ? "none" : "block";
+  if (!s.temMao) $("hint").textContent = "Mostre uma mão à câmera.";
+  $("letter").textContent = s.temMao && s.letra ? s.letra : "?";
+  $("letter").classList.toggle("dim", !s.temMao);
+  $("fg").style.strokeDashoffset = 339.3 * (1 - s.progresso);
+  $("ring").classList.toggle("done", s.progresso >= 1);
+  $("msg").textContent = !s.temMao ? "Segure a letra por um segundo para confirmá-la."
+    : s.progresso >= 1 ? "Letra confirmada. Abaixe a mão para repetir."
+    : s.progresso > 0 ? "Continue segurando…"
+    : s.conf < cfg.conf_min ? "Ainda não tenho certeza. Mostre a palma inteira." : "Segure firme.";
+  [0,1,2].forEach(i => {
+    const t = s.top3[i];
+    $("bl"+i).textContent = t ? t[0] : "–";
+    $("bb"+i).style.width = t ? Math.round(t[1]*100) + "%" : "0";
+    $("bp"+i).textContent = t ? Math.round(t[1]*100) + "%" : "";
+  });
+  $("texto").textContent = texto;
+  document.querySelectorAll(".letters b").forEach(b => b.classList.toggle("now", s.temMao && b.dataset.l === s.letra));
+  if (n !== nVisto){
+    nVisto = n;
+    const b = document.querySelector(`.letters b[data-l="${ultima}"]`);
+    if (b){ b.classList.add("added"); clearTimeout(flashT); flashT = setTimeout(() => b.classList.remove("added"), 600); }
+  }
+}
+function acao(t){ if (t === "espaco") texto += " "; else if (t === "apagar") texto = texto.slice(0, -1); else if (t === "limpar") texto = ""; $("texto").textContent = texto; }
+document.querySelectorAll("[data-a]").forEach(b => b.onclick = () => acao(b.dataset.a));
+$("copiar").onclick = async () => {
+  try { await navigator.clipboard.writeText(texto); $("copiar").textContent = "Copiado"; }
+  catch { $("copiar").textContent = "Não foi possível copiar"; }
+  setTimeout(() => $("copiar").textContent = "Copiar texto", 1500);
+};
+$("ouvir").onclick = () => { if (!texto.trim()) return; const u = new SpeechSynthesisUtterance(texto.toLowerCase()); u.lang = "pt-BR"; speechSynthesis.speak(u); };
+document.addEventListener("keydown", e => {
+  if (e.target.tagName === "INPUT") return;
+  if (e.code === "Space"){ e.preventDefault(); acao("espaco"); }
+  else if (e.key === "Backspace"){ acao("apagar"); }
+  else if (e.key.toLowerCase() === "c"){ acao("limpar"); }
+});
+$("conf").oninput = e => { cfg.conf_min = e.target.value / 100; $("confV").textContent = e.target.value + "%"; };
+$("hold").oninput = e => { cfg.hold = e.target.value / 10; $("holdV").textContent = cfg.hold.toFixed(1) + " s"; };
+$("conf").value = 80; $("confV").textContent = "80%"; $("hold").value = 10; $("holdV").textContent = "1.0 s";
+
+// ---- início
+async function iniciar(){
+  $("ativar").disabled = true; $("ativar").textContent = "Carregando…";
+  setStatus("", "Carregando o modelo…");
+  try {
+    if (!M){ M = await (await fetch("modelo.json")).json(); construir(); }
+    const hands = new Hands({locateFile: f => "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/" + f});
+    hands.setOptions({maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
+    hands.onResults(aoResultado);
+    cam.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480}});
+    await cam.play();
+    out.width = cam.videoWidth; out.height = cam.videoHeight;
+    $("ativar").style.display = "none";
+    mostrarHint("Mostre uma mão à câmera.");
+    (async function laco(){
+      ctx.save(); ctx.scale(-1, 1); ctx.drawImage(cam, -out.width, 0, out.width, out.height); ctx.restore();  // espelha, como no treino
+      await hands.send({image: out});
+      requestAnimationFrame(laco);
+    })();
+  } catch (e) {
+    $("ativar").disabled = false; $("ativar").textContent = "Tentar de novo";
+    setStatus("err", e.name === "NotAllowedError" ? "Câmera bloqueada" : "Não foi possível iniciar");
+    mostrarHint(e.name === "NotAllowedError"
+      ? "O navegador bloqueou a câmera. Clique no cadeado ao lado do endereço, permita a câmera e tente de novo."
+      : "Algo falhou ao iniciar. Feche outros programas que usam a câmera, recarregue a página e tente de novo.");
+  }
+}
+$("ativar").onclick = iniciar;
+</script>
+
+</body>
+</html>

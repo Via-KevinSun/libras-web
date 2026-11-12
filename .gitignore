@@ -1,0 +1,7 @@
+venv/
+__pycache__/
+*.csv
+dataset_letras/
+TokenAPI.txt
+.env
+.DS_Store
