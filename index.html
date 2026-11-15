@@ -133,7 +133,7 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 const $ = id => document.getElementById(id);
 const ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", JANELA = 8;
 const cfg = {conf_min: 0.80, hold: 1.0};
-let M = null, texto = "", n = 0, ultima = "", recentes = [], cand = null, desde = 0, emitida = false, flashT = null;
+let fps = 0, tAnt = performance.now(), M = null, texto = "", n = 0, ultima = "", recentes = [], cand = null, desde = 0, emitida = false, flashT = null;
 const cam = $("cam"), out = $("out"), ctx = out.getContext("2d");
 
 function setStatus(cls, txt){ $("status").className = "status " + cls; $("statusTxt").textContent = txt; }
@@ -189,7 +189,7 @@ function construir(){
 }
 let nVisto = 0;
 function desenhar(s){
-  setStatus("on", s.temMao ? "Mão detectada" : "Procurando a mão");
+  setStatus("on", (s.temMao ? "Mão detectada" : "Procurando a mão") + " · " + Math.round(fps) + " fps");
   $("hint").style.display = s.temMao ? "none" : "block";
   if (!s.temMao) $("hint").textContent = "Mostre uma mão à câmera.";
   $("letter").textContent = s.temMao && s.letra ? s.letra : "?";
@@ -239,9 +239,9 @@ async function iniciar(){
   try {
     if (!M){ M = await (await fetch("modelo.json")).json(); construir(); }
     const hands = new Hands({locateFile: f => "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/" + f});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 1, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
+    hands.setOptions({maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
     hands.onResults(aoResultado);
-    cam.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: 640, height: 480}});
+    cam.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 480}, height: {ideal: 360}, frameRate: {ideal: 30}}});
     await cam.play();
     out.width = cam.videoWidth; out.height = cam.videoHeight;
     $("ativar").style.display = "none";
@@ -249,6 +249,7 @@ async function iniciar(){
     (async function laco(){
       ctx.save(); ctx.scale(-1, 1); ctx.drawImage(cam, -out.width, 0, out.width, out.height); ctx.restore();  // espelha, como no treino
       await hands.send({image: out});
+      const t = performance.now(); fps = fps ? 0.9 * fps + 100 / (t - tAnt) : 1000 / (t - tAnt); tAnt = t;
       requestAnimationFrame(laco);
     })();
   } catch (e) {
