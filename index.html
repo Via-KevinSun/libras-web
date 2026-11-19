@@ -3,7 +3,7 @@
 <head>
 <meta charset="utf-8">
 <meta name="viewport" content="width=device-width, initial-scale=1">
-<title>Letras em LIBRAS</title>
+<title>LIBRAS: letras e palavras</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Atkinson+Hyperlegible:wght@400;700&display=swap" rel="stylesheet">
 <style>
@@ -40,8 +40,8 @@ h1{font-size:1.6rem;margin:0;letter-spacing:-.01em}
 .bar span:last-child{text-align:right;color:var(--muted)}
 .write{margin-top:32px}
 .write h2,.alpha h2{font-size:1.1rem;margin:0 0 8px}
-#texto{min-height:84px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:2.2rem;font-weight:700;letter-spacing:.06em;word-break:break-all}
-#texto:empty::before{content:"As letras confirmadas aparecem aqui.";font-size:1rem;font-weight:400;letter-spacing:0;color:var(--muted)}
+#texto{min-height:84px;padding:14px 18px;background:#fff;border:1px solid var(--line);border-radius:12px;font-size:2.2rem;font-weight:700;letter-spacing:.06em;overflow-wrap:anywhere}
+#texto:empty::before{content:"As letras e palavras confirmadas aparecem aqui.";font-size:1rem;font-weight:400;letter-spacing:0;color:var(--muted)}
 .actions{display:flex;gap:8px;flex-wrap:wrap;margin-top:12px}
 .btn{padding:9px 16px;border:1px solid var(--line);background:#fff;border-radius:8px;cursor:pointer}
 .btn:hover{border-color:var(--blue)}
@@ -59,6 +59,14 @@ summary{cursor:pointer;font-weight:700}
 .ctl small{display:block;color:var(--muted)}
 input[type=range]{width:100%;accent-color:var(--blue)}
 .tips{margin:24px 0 0;padding-left:20px;max-width:70ch}
+.modes{display:flex;gap:8px;margin:0 0 20px}
+.modes .btn[aria-pressed=true]{background:var(--blue);border-color:var(--blue);color:#fff}
+.letter.word{font-size:1.45rem;letter-spacing:.02em;text-align:center;padding:0 16px;overflow-wrap:anywhere}
+.bars.w .bar{grid-template-columns:108px 1fr 44px}
+.words{display:flex;flex-wrap:wrap;gap:6px}
+.words b{padding:4px 12px;border-radius:999px;border:1px solid var(--line);background:#fff;font-size:.95rem;font-weight:400;transition:background .15s}
+.words b.now{background:var(--gold);border-color:var(--gold)}
+.words b.added{background:var(--ok);border-color:var(--ok);color:#fff}
 @media(max-width:820px){.grid{grid-template-columns:1fr}.letters{grid-template-columns:repeat(9,1fr)}.ctl{grid-template-columns:1fr 56px}.ctl>div{grid-column:1/-1}}
 @media(prefers-reduced-motion:reduce){*{transition:none!important}}
 </style>
@@ -67,11 +75,17 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 <div class="wrap">
   <header>
     <div>
-      <h1>Letras em LIBRAS</h1>
-      <p class="sub">Faça uma letra do alfabeto manual diante da câmera e veja a palavra se formar.</p>
+      <h1>LIBRAS: letras e palavras</h1>
+      <p class="sub">Soletre com o alfabeto manual ou faça o sinal de uma palavra, e veja o texto se formar.</p>
     </div>
     <div class="status" id="status" role="status"><span class="dot"></span><span id="statusTxt">Câmera desligada</span></div>
   </header>
+
+  <div class="modes" role="group" aria-label="O que reconhecer">
+    <button class="btn" id="modoL" aria-pressed="true">Letras</button>
+    <button class="btn" id="modoP" aria-pressed="false">Palavras</button>
+  </div>
+  <p class="note" id="avisoModo" role="status" style="margin:-8px 0 16px"></p>
 
   <div class="grid">
     <div class="stage">
@@ -100,10 +114,16 @@ input[type=range]{width:100%;accent-color:var(--blue)}
       <button class="btn main" id="copiar">Copiar texto</button>
       <button class="btn" id="ouvir">Ouvir texto</button>
     </div>
-    <p class="note">Atalhos: barra de espaço, Backspace e a tecla C (limpar).</p>
+    <p class="note">Atalhos: barra de espaço, Backspace, C (limpar), L (letras) e P (palavras).</p>
   </section>
 
-  <section class="alpha">
+  <section class="alpha" id="secP" hidden>
+    <h2>Palavras que o programa conhece</h2>
+    <div class="words" id="words"></div>
+    <p class="note">Vocabulário pequeno (20 sinais do conjunto MINDS-Libras). O programa reconhece um sinal por vez: faça o sinal com as mãos bem visíveis e abaixe as mãos para confirmar. A LIBRAS tem milhares de sinais e gramática própria; isto é uma demonstração com vocabulário restrito.</p>
+  </section>
+
+  <section class="alpha" id="secL">
     <h2>Letras que o programa conhece</h2>
     <div class="letters" id="letters"></div>
     <p class="note">As letras tracejadas ainda não foram treinadas: faltam muitas do alfabeto e todas as que exigem movimento. Este programa reconhece o alfabeto manual, não a LIBRAS completa.</p>
@@ -119,7 +139,12 @@ input[type=range]{width:100%;accent-color:var(--blue)}
       <div><label for="hold">Tempo segurando a letra</label><small>Suba se letras saírem sem querer; baixe se demorar demais.</small></div>
       <input type="range" id="hold" min="5" max="20" step="1"><span id="holdV"></span>
     </div>
+    <div class="ctl">
+      <div><label for="confP">Confiança para palavras</label><small>Mínimo para aceitar uma palavra. Baixe se nenhuma for aceita.</small></div>
+      <input type="range" id="confP" min="30" max="90" step="1"><span id="confPV"></span>
+    </div>
     <ul class="tips">
+      <li>Palavras: faça o sinal completo, com as duas mãos visíveis, e abaixe as mãos. Espere o resultado antes do próximo sinal.</li>
       <li>Repita uma letra (como em BOLA ou CASA) abaixando a mão entre uma e outra.</li>
       <li>Use boa luz e deixe a palma inteira visível. M e N são as letras mais difíceis.</li>
       <li>Acentos e Ç não são escritos: OLÁ sai como OLA.</li>
@@ -132,7 +157,8 @@ input[type=range]{width:100%;accent-color:var(--blue)}
 <script>
 const $ = id => document.getElementById(id);
 const ALL = "ABCDEFGHIJKLMNOPQRSTUVWXYZ", JANELA = 8;
-const cfg = {conf_min: 0.80, hold: 1.0};
+const cfg = {conf_min: 0.80, hold: 1.0, conf_pal: 0.50};
+let modo = "L", MP = null, hands = null, grav = null, resultadoP = null, nPVisto = 0, ultimaP = -1, flashP = null;
 let fps = 0, tAnt = performance.now(), M = null, texto = "", n = 0, ultima = "", recentes = [], cand = null, desde = 0, emitida = false, flashT = null;
 const cam = $("cam"), out = $("out"), ctx = out.getContext("2d");
 
@@ -140,24 +166,154 @@ function setStatus(cls, txt){ $("status").className = "status " + cls; $("status
 function mostrarHint(t){ $("hint").style.display = "block"; $("hint").textContent = t; }
 
 // ---- modelo (mesma conta da rede treinada: Dense-ReLU, Dense-ReLU, Dense-Softmax)
+// <modelo>
 function denso(x, W, b, relu){
   const y = b.slice();
   for (let i = 0; i < x.length; i++){ const xi = x[i], r = W[i]; for (let j = 0; j < y.length; j++) y[j] += xi * r[j]; }
   return relu ? y.map(v => Math.max(0, v)) : y;
 }
-function prever(x){
-  const z = denso(denso(denso(x, M.W0, M.b0, true), M.W1, M.b1, true), M.W2, M.b2, false);
+function prever(x, R = M){
+  const z = denso(denso(denso(x, R.W0, R.b0, true), R.W1, R.b1, true), R.W2, R.b2, false);
   const mx = Math.max(...z), e = z.map(v => Math.exp(v - mx)), s = e.reduce((a, c) => a + c, 0);
   return e.map(v => v / s);
 }
+// </modelo>
 function normalizar(lm){                       // identica ao treino
   const o = lm[0], pts = lm.map(p => [p.x - o.x, p.y - o.y, p.z - o.z]);
   const esc = Math.max(Math.hypot(pts[9][0], pts[9][1]), 1e-6);
   return pts.flatMap(p => [p[0] / esc, p[1] / esc, p[2] / esc]);
 }
 
-// ---- tempo real
+// ---- palavras: sequências de quadros (igual ao extrair_palavras.py)
+// <seq>
+const TQ = 20, FQ = 90, MIN_COM_MAO = 6, GAP_MS = 600, MAX_MS = 6000;
+function featuresFrame(maos){                    // maos: lista de mãos, cada uma com 21 pontos {x, y, z}
+  const ord = maos.slice().sort((a, b) => a[0].x - b[0].x).slice(0, 2);
+  const v = new Array(FQ).fill(0);
+  ord.forEach((lm, k) => {
+    const o = lm[0], xy = lm.map(p => [p.x - o.x, p.y - o.y]);
+    const esc = Math.max(Math.hypot(xy[9][0], xy[9][1]), 1e-6);
+    xy.forEach((q, i) => { v[k * 42 + 2 * i] = q[0] / esc; v[k * 42 + 2 * i + 1] = q[1] / esc; });
+    v[84 + 2 * k] = o.x; v[85 + 2 * k] = o.y; v[88 + k] = 1;
+  });
+  return v;
+}
+function reamostrar(seq){                        // TQ quadros escolhidos ao longo do sinal
+  const L = seq.length, r = [];
+  for (let i = 0; i < TQ; i++) r.push(seq[Math.min(L - 1, Math.max(0, Math.floor(i * (L - 1) / (TQ - 1) + 0.5)))]);
+  return r;
+}
+class Gravador {
+  constructor(){ this.reset(); }
+  reset(){ this.q = []; this.ativo = false; this.ultimaMao = 0; this.inicio = 0; }
+  push(maos, t){                                 // devolve null, ou {seq} quando um sinal terminou
+    if (maos.length){
+      if (!this.ativo){ this.ativo = true; this.q = []; this.inicio = t; }
+      this.ultimaMao = t; this.q.push(featuresFrame(maos));
+    } else if (this.ativo){
+      this.q.push(new Array(FQ).fill(0));
+      if (t - this.ultimaMao >= GAP_MS) return this.fechar();
+    }
+    if (this.ativo && t - this.inicio >= MAX_MS) return this.fechar();
+    return null;
+  }
+  fechar(){
+    const q = this.q; this.reset();
+    const pres = f => f[88] + f[89] > 0;
+    let a = 0, b = q.length - 1;
+    while (a <= b && !pres(q[a])) a++;
+    while (b >= a && !pres(q[b])) b--;
+    const seq = q.slice(a, b + 1);
+    return {seq: seq.filter(pres).length >= MIN_COM_MAO ? seq : null};
+  }
+}
+// </seq>
+grav = new Gravador();
+
+function aoResultadoP(res){
+  const agora = performance.now(), maos = res.multiHandLandmarks || [];
+  maos.forEach(lm => {
+    drawConnectors(ctx, lm, HAND_CONNECTIONS, {color: "#E8A90C", lineWidth: 3});
+    drawLandmarks(ctx, lm, {color: "#fff", lineWidth: 1, radius: 3});
+  });
+  const fim = grav.push(maos, agora);
+  if (fim){
+    if (!fim.seq) resultadoP = {curto: true};
+    else {
+      const p = prever(reamostrar(fim.seq).flat(), MP);
+      const ordem = p.map((v, i) => i).sort((a, b) => p[b] - p[a]).slice(0, 3);
+      const ok = p[ordem[0]] >= cfg.conf_pal;
+      resultadoP = {top3: ordem.map(i => [MP.classes[i], p[i]]), idx: ordem[0], ok};
+      if (ok){
+        const w = MP.classes[ordem[0]];
+        texto += (texto && !texto.endsWith(" ") ? " " : "") + w + " ";
+        nPVisto = -1; ultimaP = ordem[0];
+      }
+    }
+  }
+  desenharP(maos.length > 0);
+}
+function desenharP(temMao){
+  const g = grav.ativo, r = resultadoP;
+  setStatus("on", (g ? "Gravando o sinal" : temMao ? "Mão detectada" : "Procurando as mãos") + " · " + Math.round(fps) + " fps");
+  $("hint").style.display = (temMao || g) ? "none" : "block";
+  if (!temMao && !g) $("hint").textContent = "Mostre as mãos à câmera e faça o sinal.";
+  const L = $("letter");
+  L.classList.add("word"); L.classList.toggle("dim", !(r && r.ok) && !g);
+  L.textContent = g ? "…" : r && r.ok ? MP.classes[r.idx] : "?";
+  $("fg").style.strokeDashoffset = 339.3 * (1 - (g ? 0 : r && r.ok ? 1 : 0));
+  $("ring").classList.toggle("done", !g && !!(r && r.ok));
+  $("msg").textContent = g ? "Gravando… abaixe as mãos quando terminar o sinal."
+    : !r ? "Faça o sinal da palavra e abaixe as mãos para confirmar."
+    : r.curto ? "Sinal curto demais. Tente de novo."
+    : r.ok ? "Palavra confirmada. Faça outro sinal quando quiser."
+    : "Não tenho certeza (" + Math.round(r.top3[0][1] * 100) + "%). Tente de novo, com as duas mãos bem visíveis.";
+  $("bars").className = "bars w";
+  [0, 1, 2].forEach(i => {
+    const t = !g && r && r.top3 ? r.top3[i] : null;
+    $("bl" + i).textContent = t ? t[0] : "–";
+    $("bb" + i).style.width = t ? Math.round(t[1] * 100) + "%" : "0";
+    $("bp" + i).textContent = t ? Math.round(t[1] * 100) + "%" : "";
+  });
+  $("texto").textContent = texto;
+  document.querySelectorAll(".words b").forEach(b => b.classList.toggle("now", !g && !!(r && r.top3) && +b.dataset.w === r.idx));
+  if (nPVisto === -1){
+    nPVisto = 0;
+    const b = document.querySelector(`.words b[data-w="${ultimaP}"]`);
+    if (b){ b.classList.add("added"); clearTimeout(flashP); flashP = setTimeout(() => b.classList.remove("added"), 700); }
+  }
+}
+function construirP(){
+  $("words").innerHTML = MP.classes.map((w, i) => `<b data-w="${i}">${w}</b>`).join("");
+}
+async function trocarModo(m){
+  if (m === modo) return;
+  $("avisoModo").textContent = "";
+  if (m === "P" && !MP){
+    try {
+      const r = await fetch("modelo_palavras.json");
+      if (!r.ok) throw new Error("404");
+      MP = await r.json(); construirP();
+    } catch {
+      $("avisoModo").textContent = "O modelo de palavras ainda não está instalado (falta o arquivo modelo_palavras.json ao lado desta página).";
+      return;
+    }
+  }
+  modo = m; grav.reset(); recentes = []; cand = null; emitida = false; resultadoP = null;
+  $("modoL").setAttribute("aria-pressed", m === "L"); $("modoP").setAttribute("aria-pressed", m === "P");
+  $("secL").hidden = m !== "L"; $("secP").hidden = m !== "P";
+  $("letter").classList.toggle("word", m === "P"); $("letter").textContent = "?"; $("letter").classList.add("dim");
+  $("bars").className = m === "P" ? "bars w" : "bars";
+  $("fg").style.strokeDashoffset = 339.3; $("ring").classList.remove("done");
+  $("msg").textContent = m === "P" ? "Faça o sinal da palavra e abaixe as mãos para confirmar." : "Segure a letra por um segundo para confirmá-la.";
+  if (hands) hands.setOptions({maxNumHands: m === "P" ? 2 : 1});
+}
+$("modoL").onclick = () => trocarModo("L");
+$("modoP").onclick = () => trocarModo("P");
+
+// ---- tempo real (letras)
 function aoResultado(res){
+  if (modo === "P") return aoResultadoP(res);
   const agora = performance.now() / 1000;
   let temMao = false, top3 = [], letraAtual = null, conf = 0, prog = 0;
   if (res.multiHandLandmarks && res.multiHandLandmarks.length){
@@ -227,10 +383,13 @@ document.addEventListener("keydown", e => {
   if (e.code === "Space"){ e.preventDefault(); acao("espaco"); }
   else if (e.key === "Backspace"){ acao("apagar"); }
   else if (e.key.toLowerCase() === "c"){ acao("limpar"); }
+  else if (e.key.toLowerCase() === "p"){ trocarModo("P"); }
+  else if (e.key.toLowerCase() === "l"){ trocarModo("L"); }
 });
+$("confP").oninput = e => { cfg.conf_pal = e.target.value / 100; $("confPV").textContent = e.target.value + "%"; };
 $("conf").oninput = e => { cfg.conf_min = e.target.value / 100; $("confV").textContent = e.target.value + "%"; };
 $("hold").oninput = e => { cfg.hold = e.target.value / 10; $("holdV").textContent = cfg.hold.toFixed(1) + " s"; };
-$("conf").value = 80; $("confV").textContent = "80%"; $("hold").value = 10; $("holdV").textContent = "1.0 s";
+$("conf").value = 80; $("confV").textContent = "80%"; $("confP").value = 50; $("confPV").textContent = "50%"; $("hold").value = 10; $("holdV").textContent = "1.0 s";
 
 // ---- início
 async function iniciar(){
@@ -238,8 +397,8 @@ async function iniciar(){
   setStatus("", "Carregando o modelo…");
   try {
     if (!M){ M = await (await fetch("modelo.json")).json(); construir(); }
-    const hands = new Hands({locateFile: f => "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/" + f});
-    hands.setOptions({maxNumHands: 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
+    hands = new Hands({locateFile: f => "https://cdn.jsdelivr.net/npm/@mediapipe/hands@0.4.1675469240/" + f});
+    hands.setOptions({maxNumHands: modo === "P" ? 2 : 1, modelComplexity: 0, minDetectionConfidence: 0.6, minTrackingConfidence: 0.5});
     hands.onResults(aoResultado);
     cam.srcObject = await navigator.mediaDevices.getUserMedia({video: {width: {ideal: 480}, height: {ideal: 360}, frameRate: {ideal: 30}}});
     await cam.play();
